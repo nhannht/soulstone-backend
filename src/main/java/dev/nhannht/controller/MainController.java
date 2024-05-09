@@ -73,9 +73,10 @@ public class MainController {
                     var updated = pluginStats.get("updated").longValue();
 
                     var plugin = new ObsidianPlugin(id, name, author, description);
-                    obsidianPluginRepository.save(plugin);
                     var pluginDetail = new PluginStatsDetails(downloads, updated);
                     pluginDetail.setPlugin(plugin);
+
+                    obsidianPluginRepository.save(plugin);
                     pluginStatsDetailsRepository.save(pluginDetail);
 
                     pluginStats.fields().forEachRemaining(field -> {
@@ -92,28 +93,32 @@ public class MainController {
                     });
                     pluginVersionRepository.saveAll(versions);
 
-//
-//                    JsonNode repoJsonNode;
-//                    try {
-//                        repoJsonNode = githubRestClient.getRepo(token, repoOwner, repoName);
-//                        var repo = new GithubRepository(repoOwner, repoName);
-//
-//                        repo.setPlugin(plugin);
-//                        var topicJsonNode = repoJsonNode.get("topics");
-//                        var topicsList = new HashSet<RepoTopic>();
-//                        topicJsonNode.elements().forEachRemaining(e -> {
-//                            topicsList.add(new RepoTopic(e.textValue()));
-//
-//                        });
-//                        repo.setTopics(topicsList);
-//
-//                        repoTopicRepository.saveAll(topicsList);
-//                        githubRepositoryRepository.save(repo);
-//
-//
-//                    } catch (ClientWebApplicationException e) {
-//                        // do nothing
-//                    }
+                    JsonNode repoJsonNode;
+                    try {
+                        var repoOwner = repoFullName.split("/")[0];
+                        var repoName = repoFullName.split("/")[1];
+                        repoJsonNode = githubRestClient.getRepo(token, repoOwner, repoName);
+                        var repo = new GithubRepository(repoOwner, repoName);
+
+                        repo.setPlugin(plugin);
+                        var topicJsonNode = repoJsonNode.get("topics");
+                        var topicsList = new HashSet<RepoTopic>();
+                        topicJsonNode.elements().forEachRemaining(e -> {
+                            var topic = new RepoTopic(e.textValue());
+
+                            topicsList.add(topic);
+
+                        });
+                        repo.setTopics(topicsList);
+
+                        repoTopicRepository.saveAll(topicsList);
+                        githubRepositoryRepository.save(repo);
+
+
+                    } catch (ClientWebApplicationException e) {
+                        System.out.println(e);
+                        // do nothing
+                    }
 //
 
 //

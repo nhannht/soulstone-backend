@@ -11,7 +11,7 @@ import java.util.Set;
 @NoArgsConstructor
 @RequiredArgsConstructor
 public class GithubRepository {
-    @Id @GeneratedValue @Column(name="topic_id")
+    @Id @GeneratedValue @Column(name="repo_id")
     Long repoId;
 
     @NonNull String owner;
@@ -20,7 +20,7 @@ public class GithubRepository {
     @ManyToMany
     Set<RepoTopic> topics;
 
-    @OneToOne(cascade = CascadeType.MERGE)
+    @OneToOne
     @JoinColumn(name="plugin_id",referencedColumnName = "plugin_id")
     ObsidianPlugin plugin;
 

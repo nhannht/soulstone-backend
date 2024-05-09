@@ -28,13 +28,13 @@ public class ObsidianPlugin {
     String description;
 
 
-    @OneToOne(mappedBy = "plugin")
+    @OneToOne(mappedBy = "plugin",cascade = CascadeType.ALL)
     PluginStatsDetails statsDetails;
 
     @OneToMany(mappedBy = "plugin",cascade = CascadeType.ALL)
     List<PluginVersion> pluginVersionList;
 
-    @OneToOne(mappedBy = "plugin",cascade = CascadeType.MERGE)
+    @OneToOne(mappedBy = "plugin",cascade = CascadeType.ALL)
     GithubRepository repo;
 
 

@@ -11,7 +11,7 @@ import lombok.*;
 public class PluginStatsDetails {
     @Id @GeneratedValue Long detailId;
 
-    @OneToOne(cascade = CascadeType.MERGE)
+    @OneToOne
     @JoinColumn(name="plugin_id",referencedColumnName = "plugin_id")
     ObsidianPlugin plugin;
 
