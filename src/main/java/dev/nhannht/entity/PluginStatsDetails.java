@@ -13,7 +13,7 @@ public class PluginStatsDetails {
 
     @OneToOne
     @JoinColumn(name="plugin_id",referencedColumnName = "plugin_id")
-    ObsidianPlugin plugin;
+    Plugin plugin;
 
     @NonNull Long downloads;
 

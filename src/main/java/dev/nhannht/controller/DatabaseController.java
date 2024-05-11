@@ -6,20 +6,28 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.nhannht.entity.*;
 import dev.nhannht.repository.*;
 import dev.nhannht.restclient.GithubRestClient;
+import dev.nhannht.restclient.InternalRestClient;
 import dev.nhannht.restclient.ObsidianPluginRestClient;
+import dev.nhannht.service.SwitchManager;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.eclipse.microprofile.context.ManagedExecutor;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.jboss.resteasy.reactive.ClientWebApplicationException;
+import org.jboss.resteasy.reactive.RestResponse;
 
-import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.StreamSupport;
 
 @Path("/api")
-public class MainController {
+public class DatabaseController {
+
+    @Inject
+    SwitchManager switchManager;
 
 
     @RestClient
@@ -35,20 +43,12 @@ public class MainController {
     PluginVersionRepository pluginVersionRepository;
 
 
-    @GET
-    @Path("/stats")
-    public Iterator<String> getStats() throws JsonProcessingException {
-        ObjectMapper mapper = new ObjectMapper();
-        JsonNode realObject = mapper.readTree(obsidianPluginRestClient.getStatsOfPlugin());
-        return realObject.fieldNames();
-    }
-
-    @GET
-    @Path("/plugins")
-    public List<ObsidianPlugin> gePlugins() throws JsonProcessingException {
+    private void initDatabaseInternal() throws JsonProcessingException {
+        switchManager.setDatabaseUpdating(true);
         ObjectMapper mapper = new ObjectMapper();
         var pluginsList = mapper.readTree(obsidianPluginRestClient.getPlugins());
         var pluginStatsList = mapper.readTree(obsidianPluginRestClient.getStatsOfPlugin());
+
 
         StreamSupport.stream(
                         Spliterators.spliteratorUnknownSize(
@@ -57,8 +57,6 @@ public class MainController {
                         ), false)
                 .limit(10)
                 .forEach(p -> {
-
-
                     var id = p.get("id").textValue();
                     var pluginStats = pluginStatsList.get(id);
                     var versions = new ArrayList<PluginVersion>();
@@ -72,7 +70,7 @@ public class MainController {
                     var downloads = pluginStats.get("downloads").longValue();
                     var updated = pluginStats.get("updated").longValue();
 
-                    var plugin = new ObsidianPlugin(id, name, author, description);
+                    var plugin = new Plugin(id, name, author, description);
                     var pluginDetail = new PluginStatsDetails(downloads, updated);
                     pluginDetail.setPlugin(plugin);
 
@@ -102,32 +100,99 @@ public class MainController {
 
                         repo.setPlugin(plugin);
                         var topicJsonNode = repoJsonNode.get("topics");
-                        var topicsList = new HashSet<RepoTopic>();
-                        topicJsonNode.elements().forEachRemaining(e -> {
-                            var topic = new RepoTopic(e.textValue());
+                        var topicsList = new HashSet<Topic>();
+                        repoRepository.save(repo);
 
+
+                        topicJsonNode.elements().forEachRemaining(e -> {
+                            var topic = new Topic(e.textValue());
                             topicsList.add(topic);
 
                         });
                         repo.setTopics(topicsList);
 
                         repoTopicRepository.saveAll(topicsList);
-                        githubRepositoryRepository.save(repo);
+                        repoRepository.save(repo);
 
 
                     } catch (ClientWebApplicationException e) {
                         System.out.println(e);
                         // do nothing
                     }
-//
 
 //
+//
+                })
+        ;
+        switchManager.setDatabaseUpdating(false);
+    }
+
+    @GET
+    @Path("/syncTopic")
+    public RestResponse<Object> syncTopic() {
+        if (switchManager.getDatabaseUpdating()) {
+
+            return RestResponse
+                    .ResponseBuilder
+                    .create(400)
+                    .entity("Database is blocking, currently updating in background")
+                    .build();
+        }
 
 
+        var repos = repoRepository.findAll();
+        var tempHashMap = new HashMap<Topic, HashSet<GithubRepository>>();
+        repos.forEach(r -> {
+            var topics = r.getTopics();
+            topics.forEach(t -> {
+                var repoOfTopic = Optional
+                        .ofNullable(tempHashMap.get(t))
+                        .orElse(new HashSet<>());
+                repoOfTopic.add(r);
+                tempHashMap.put(t, repoOfTopic);
+            });
+        });
+        tempHashMap.forEach((topic, reposOfTopic) -> {
+            topic.setRepos(reposOfTopic);
+            repoTopicRepository.save(topic);
+        });
 
-                });
+        return RestResponse
+                .ResponseBuilder
+                .create(200)
+                .entity("Successful sync topic")
+                .build();
 
-        return obsidianPluginRepository.findAll();
+
+    }
+
+    @Inject
+    ManagedExecutor managedExecutor;
+
+    @RestClient
+    InternalRestClient internalRestClient;
+
+
+    @GET
+    @RolesAllowed("admin")
+    @Path("/initDatabase")
+    public RestResponse<?> initDataBase() throws JsonProcessingException, ExecutionException, InterruptedException {
+
+
+        managedExecutor.submit(() -> {
+            try {
+                initDatabaseInternal();
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException(e);
+            }
+
+        });
+
+
+        return RestResponse.ResponseBuilder
+                .create(200)
+                .entity("Start init db in the background, it may took time and will blocking the database.")
+                .build();
 
     }
 
@@ -137,35 +202,29 @@ public class MainController {
     @ConfigProperty(name = "github_token")
     String token;
 
-    @GET
-    @Path("/content")
-    public String env() {
-        var jsonNode = githubRestClient.getContent(token, "obsidianmd", "obsidian-releases", "README.md");
-        var decodedBytes = Base64.getMimeDecoder().decode(jsonNode.get("content").textValue());
-        return new String(decodedBytes, StandardCharsets.UTF_8);
-
-    }
 
     @Inject
-    GithubRepositoryRepository githubRepositoryRepository;
+    RepoRepository repoRepository;
 
     @Inject
     RepoTopicRepository repoTopicRepository;
 
     @GET
-    @Path("/repo")
-    public JsonNode repo() {
-        return githubRestClient.getRepo(token, "argenos", "nldates-obsidian");
+    @Path("/topics")
+    public List<Topic> topicList() {
+        var topics = repoTopicRepository.findAll();
+        return topics;
     }
 
     @GET
     @Path("/resetDb")
-    public String resetDb(){
+    @RolesAllowed("admin")
+    public String resetDb() {
+        repoTopicRepository.deleteAll();
+        repoRepository.deleteAll();
         obsidianPluginRepository.deleteAll();
         pluginVersionRepository.deleteAll();
         pluginVersionRepository.deleteAll();
-        repoTopicRepository.deleteAll();
-        githubRepositoryRepository.deleteAll();
         return "success";
     }
 

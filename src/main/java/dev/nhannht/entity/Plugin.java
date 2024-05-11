@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.util.List;
-import java.util.Set;
 
 @Entity
 @Getter
@@ -12,7 +11,7 @@ import java.util.Set;
 @NoArgsConstructor
 @RequiredArgsConstructor
 @AllArgsConstructor
-public class ObsidianPlugin {
+public class Plugin {
     @Id @Column(name="plugin_id") @NonNull
     String pluginId;
 

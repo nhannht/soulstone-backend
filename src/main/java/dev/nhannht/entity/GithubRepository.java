@@ -11,18 +11,27 @@ import java.util.Set;
 @NoArgsConstructor
 @RequiredArgsConstructor
 public class GithubRepository {
-    @Id @GeneratedValue @Column(name="repo_id")
+    @Id
+    @GeneratedValue
+    @Column(name = "repo_id")
     Long repoId;
 
-    @NonNull String owner;
-    @NonNull String repoName;
+    @NonNull
+    String owner;
+    @NonNull
+    String repoName;
 
     @ManyToMany
-    Set<RepoTopic> topics;
+    @JoinTable(name = "jointable_repo_topic",
+            joinColumns = @JoinColumn(name = "repoJoinId"),
+            inverseJoinColumns = @JoinColumn(name = "topicJoinId")
+    )
+
+    Set<Topic> topics;
 
     @OneToOne
-    @JoinColumn(name="plugin_id",referencedColumnName = "plugin_id")
-    ObsidianPlugin plugin;
+    @JoinColumn(name = "plugin_id", referencedColumnName = "plugin_id")
+    Plugin plugin;
 
 
 //    @NonNull

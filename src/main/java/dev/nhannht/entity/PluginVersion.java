@@ -21,7 +21,7 @@ public class PluginVersion {
 
     @ManyToOne
     @JoinColumn(name="plugin_id",referencedColumnName = "plugin_id")
-    ObsidianPlugin plugin;
+    Plugin plugin;
 
 
 }
