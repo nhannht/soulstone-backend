@@ -34,7 +34,7 @@ public class DatabaseController {
     ObsidianPluginRestClient obsidianPluginRestClient;
 
     @Inject
-    ObsidianPluginRepository obsidianPluginRepository;
+    PluginRepository pluginRepository;
 
     @Inject
     PluginStatsDetailsRepository pluginStatsDetailsRepository;
@@ -59,7 +59,7 @@ public class DatabaseController {
                 .forEach(p -> {
                     var id = p.get("id").textValue();
                     var pluginStats = pluginStatsList.get(id);
-                    var versions = new ArrayList<PluginVersion>();
+                    var versions = new HashSet<PluginVersion>();
 
                     var name = p.get("name").textValue();
                     var author = p.get("author").textValue();
@@ -74,7 +74,7 @@ public class DatabaseController {
                     var pluginDetail = new PluginStatsDetails(downloads, updated);
                     pluginDetail.setPlugin(plugin);
 
-                    obsidianPluginRepository.save(plugin);
+                    pluginRepository.save(plugin);
                     pluginStatsDetailsRepository.save(pluginDetail);
 
                     pluginStats.fields().forEachRemaining(field -> {
@@ -111,7 +111,7 @@ public class DatabaseController {
                         });
                         repo.setTopics(topicsList);
 
-                        repoTopicRepository.saveAll(topicsList);
+                        topicRepository.saveAll(topicsList);
                         repoRepository.save(repo);
 
 
@@ -154,7 +154,7 @@ public class DatabaseController {
         });
         tempHashMap.forEach((topic, reposOfTopic) -> {
             topic.setRepos(reposOfTopic);
-            repoTopicRepository.save(topic);
+            topicRepository.save(topic);
         });
 
         return RestResponse
@@ -207,12 +207,12 @@ public class DatabaseController {
     RepoRepository repoRepository;
 
     @Inject
-    RepoTopicRepository repoTopicRepository;
+    TopicRepository topicRepository;
 
     @GET
     @Path("/topics")
     public List<Topic> topicList() {
-        var topics = repoTopicRepository.findAll();
+        var topics = topicRepository.findAll();
         return topics;
     }
 
@@ -220,9 +220,9 @@ public class DatabaseController {
     @Path("/resetDb")
     @RolesAllowed("admin")
     public String resetDb() {
-        repoTopicRepository.deleteAll();
+        topicRepository.deleteAll();
         repoRepository.deleteAll();
-        obsidianPluginRepository.deleteAll();
+        pluginRepository.deleteAll();
         pluginVersionRepository.deleteAll();
         pluginVersionRepository.deleteAll();
         return "success";

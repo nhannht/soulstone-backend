@@ -1,7 +1,7 @@
 package dev.nhannht.controller;
 
-import dev.nhannht.DTO.TopicDto;
-import dev.nhannht.repository.TopicRepository;
+import dev.nhannht.DTO.PluginDto;
+import dev.nhannht.repository.PluginRepository;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
@@ -12,33 +12,41 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Path("/api")
-public class TopicController {
+public class PluginController {
     @Inject
-    TopicRepository topicRepository;
+    PluginRepository pluginRepository;
 
-    @Path("/topic/getall")
+    @Path("/plugin/all")
     @GET
-    public Set<TopicDto> getAllTopics(){
-        var topics = topicRepository.findAll().stream().map(TopicDto::new).collect(Collectors.toSet());
+    public Set<PluginDto> getAllPlugin(){
+        return pluginRepository.findAll().stream().map(PluginDto::new).collect(Collectors.toSet());
 
-        return  topics;
+
     }
 
-    @Path("/topic/{name}")
+    @Path("/plugin/{id}")
     @GET
-    public RestResponse<?> getTopicByName(@PathParam("name") String name){
-        var  topic = topicRepository.findById(name);
-        if (topic.isPresent()){
+    public RestResponse<?> getPluginById(@PathParam("id") Long id){
+        var result =  pluginRepository
+                .findById(id)
+                ;
+
+        if (result.isPresent()){
             return RestResponse
                     .ResponseBuilder
-                    .ok(new TopicDto(topic.get()))
+                    .ok(new PluginDto(result.get()))
                     .build();
+
         } else {
             return RestResponse.ResponseBuilder
                     .create(404)
                     .entity("Not found")
                     .build();
         }
+
+
+
+
 
     }
 }

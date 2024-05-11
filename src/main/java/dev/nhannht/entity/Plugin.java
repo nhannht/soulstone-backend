@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Getter
@@ -31,7 +32,7 @@ public class Plugin {
     PluginStatsDetails statsDetails;
 
     @OneToMany(mappedBy = "plugin",cascade = CascadeType.ALL)
-    List<PluginVersion> pluginVersionList;
+    Set<PluginVersion> pluginVersionList;
 
     @OneToOne(mappedBy = "plugin",cascade = CascadeType.ALL)
     GithubRepository repo;
