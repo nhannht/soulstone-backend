@@ -4,6 +4,7 @@ import dev.nhannht.entity.Topic;
 import lombok.Value;
 
 import java.io.Serializable;
+import java.time.Instant;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -14,6 +15,9 @@ import java.util.stream.Collectors;
 public class TopicDto implements Serializable {
     String name;
     Set<GithubRepositoryReducedDto> repos;
+    Instant createdOn;
+    Instant updatedOn;
+
 
     public TopicDto(Topic topic){
         this.name = topic.getName();
@@ -22,6 +26,8 @@ public class TopicDto implements Serializable {
                 .stream()
                 .map(GithubRepositoryReducedDto::new)
                 .collect(Collectors.toSet());
+        this.createdOn = topic.getCreatedOn();
+        this.updatedOn = topic.getUpdatedOn();
     }
 
 }

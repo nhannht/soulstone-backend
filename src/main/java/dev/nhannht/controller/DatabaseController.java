@@ -55,7 +55,7 @@ public class DatabaseController {
                                 pluginsList.elements(),
                                 Spliterator.ORDERED
                         ), false)
-                .limit(10)
+//                .limit(10)
                 .forEach(p -> {
                     var id = p.get("id").textValue();
                     var pluginStats = pluginStatsList.get(id);
@@ -128,6 +128,7 @@ public class DatabaseController {
     }
 
     @GET
+    @RolesAllowed("admin")
     @Path("/syncTopic")
     public RestResponse<Object> syncTopic() {
         if (switchManager.getDatabaseUpdating()) {
@@ -209,12 +210,7 @@ public class DatabaseController {
     @Inject
     TopicRepository topicRepository;
 
-    @GET
-    @Path("/topics")
-    public List<Topic> topicList() {
-        var topics = topicRepository.findAll();
-        return topics;
-    }
+
 
     @GET
     @Path("/resetDb")
@@ -223,7 +219,6 @@ public class DatabaseController {
         topicRepository.deleteAll();
         repoRepository.deleteAll();
         pluginRepository.deleteAll();
-        pluginVersionRepository.deleteAll();
         pluginVersionRepository.deleteAll();
         return "success";
     }

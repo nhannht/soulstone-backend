@@ -4,6 +4,7 @@ import dev.nhannht.entity.Plugin;
 import lombok.Value;
 
 import java.io.Serializable;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -20,6 +21,9 @@ public class PluginDto implements Serializable {
     PluginStatsDetailsReducedDto statsDetails;
     Set<PluginVersionReducedDto> pluginVersionList;
     GithubRepositoryReducedDto repo;
+    Instant createdOn;
+    Instant updatedOn;
+
 
     public PluginDto(Plugin plugin){
         this.pluginId = plugin.getPluginId();
@@ -29,6 +33,8 @@ public class PluginDto implements Serializable {
         this.statsDetails = new PluginStatsDetailsReducedDto(plugin.getStatsDetails());
         this.pluginVersionList = plugin.getPluginVersionList().stream().map(PluginVersionReducedDto::new).collect(Collectors.toSet());
         this.repo = new GithubRepositoryReducedDto(plugin.getRepo());
+        this.createdOn = plugin.getCreatedOn();
+        this.updatedOn = plugin.getUpdatedOn();
 
     }
 }

@@ -2,7 +2,10 @@ package dev.nhannht.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.Instant;
 import java.util.Set;
 
 @Getter
@@ -24,4 +27,10 @@ public class Topic {
     )
 
     Set<GithubRepository> repos;
+
+    @CreationTimestamp
+    private Instant createdOn;
+
+    @UpdateTimestamp
+    private Instant updatedOn;
 }

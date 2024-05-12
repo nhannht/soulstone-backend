@@ -17,7 +17,7 @@ import lombok.*;
 public class User extends PanacheEntity {
     @Username
     public String username;
-    @Password(PasswordType.CLEAR)
+    @Password
     public String password;
     @Roles
     public String role;
@@ -26,7 +26,7 @@ public class User extends PanacheEntity {
     public static void add(String username, String password, String role) {
         User user = new User();
         user.username = username;
-        user.password = password;
+        user.password = BcryptUtil.bcryptHash(password);
         user.role = role;
         user.persist();
     }
