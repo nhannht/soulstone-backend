@@ -2,6 +2,7 @@ package dev.nhannht.controller;
 
 import dev.nhannht.DTO.TopicDto;
 import dev.nhannht.repository.TopicRepository;
+import io.quarkus.cache.CacheResult;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
@@ -16,6 +17,7 @@ public class TopicController {
     @Inject
     TopicRepository topicRepository;
 
+    @CacheResult(cacheName = "getAllTopic-cache")
     @Path("/topic/getall")
     @GET
     public Set<TopicDto> getAllTopics(){
@@ -24,6 +26,7 @@ public class TopicController {
         return  topics;
     }
 
+    @CacheResult(cacheName = "getTopicByName-cache")
     @Path("/topic/{name}")
     @GET
     public RestResponse<?> getTopicByName(@PathParam("name") String name){

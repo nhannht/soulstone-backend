@@ -2,6 +2,7 @@ package dev.nhannht.controller;
 
 import dev.nhannht.DTO.GithubRepositoryDto;
 import dev.nhannht.repository.RepoRepository;
+import io.quarkus.cache.CacheResult;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
@@ -16,6 +17,7 @@ public class RepoController {
     @Inject
     RepoRepository repoRepository;
 
+    @CacheResult(cacheName = "getAllRepo-cache")
     @GET
     @Path("/repo/all")
     public Set<GithubRepositoryDto> getAllRepo(){
@@ -26,6 +28,7 @@ public class RepoController {
                 .collect(Collectors.toSet());
     }
 
+    @CacheResult(cacheName = "findByFullName-cache")
     @GET
     @Path("/repo/get")
     public RestResponse<?> findByFullName(

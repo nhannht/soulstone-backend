@@ -14,9 +14,16 @@ public class GithubRepositoryReducedDto implements Serializable {
     String owner;
     String repoName;
 
-    public GithubRepositoryReducedDto(GithubRepository repo){
-        this.repoId = repo.getRepoId();
-        this.owner = repo.getOwner();
-        this.repoName = repo.getRepoName();
+    public GithubRepositoryReducedDto(GithubRepository repo) {
+        if (repo == null) {
+            this.repoId = (long) -1;
+            this.owner = "null";
+            this.repoName = "null";
+
+        } else {
+            this.repoId = repo.getRepoId();
+            this.owner = repo.getOwner();
+            this.repoName = repo.getRepoName();
+        }
     }
 }

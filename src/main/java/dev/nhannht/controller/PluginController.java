@@ -2,6 +2,7 @@ package dev.nhannht.controller;
 
 import dev.nhannht.DTO.PluginDto;
 import dev.nhannht.repository.PluginRepository;
+import io.quarkus.cache.CacheResult;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
@@ -18,18 +19,20 @@ public class PluginController {
 
     @Path("/plugin/all")
     @GET
+    @CacheResult(cacheName="getAllPlugin-cache")
     public Set<PluginDto> getAllPlugin(){
+//        System.out.println(pluginRepository.findAll());
         return pluginRepository.findAll().stream().map(PluginDto::new).collect(Collectors.toSet());
 
 
     }
 
+    @CacheResult(cacheName = "getPluginById-cache")
     @Path("/plugin/{id}")
     @GET
-    public RestResponse<?> getPluginById(@PathParam("id") Long id){
+    public RestResponse<?> getPluginById(@PathParam("id") String pluginId){
         var result =  pluginRepository
-                .findById(id)
-                ;
+                .findByPluginIdIgnoreCase(pluginId);
 
         if (result.isPresent()){
             return RestResponse
