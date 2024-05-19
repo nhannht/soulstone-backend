@@ -6,6 +6,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.Set;
 
 @Getter
@@ -26,7 +27,7 @@ public class Topic {
             inverseJoinColumns = @JoinColumn(name = "repoJoinId")
     )
 
-    Set<GithubRepository> repos;
+    Set<GithubRepository> repos = new HashSet<>();
 
     @CreationTimestamp
     private Instant createdOn;

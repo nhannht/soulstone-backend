@@ -3,6 +3,7 @@ package dev.nhannht.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.HashSet;
 import java.util.Set;
 
 @Entity
@@ -17,7 +18,7 @@ public class GithubRepository {
     Long repoId;
 
     @NonNull
-    String owner;
+    String owner ;
     @NonNull
     String repoName;
 
@@ -26,12 +27,13 @@ public class GithubRepository {
             joinColumns = @JoinColumn(name = "repoJoinId"),
             inverseJoinColumns = @JoinColumn(name = "topicJoinId")
     )
-
-    Set<Topic> topics;
+    Set<Topic> topics = new HashSet<>();
 
     @OneToOne
     @JoinColumn(name = "plugin_id", referencedColumnName = "plugin_id")
-    Plugin plugin;
+    Plugin plugin = null;
+
+
 
 
 //    @NonNull

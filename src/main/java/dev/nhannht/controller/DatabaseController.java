@@ -6,11 +6,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.nhannht.entity.*;
 import dev.nhannht.repository.*;
 import dev.nhannht.restclient.GithubRestClient;
-import dev.nhannht.restclient.InternalRestClient;
 import dev.nhannht.restclient.ObsidianPluginRestClient;
+import dev.nhannht.service.MultiThreadingService;
 import dev.nhannht.service.SwitchManager;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -19,8 +20,10 @@ import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.jboss.resteasy.reactive.ClientWebApplicationException;
 import org.jboss.resteasy.reactive.RestResponse;
 
+import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 @Path("/api")
@@ -28,6 +31,8 @@ public class DatabaseController {
 
     @Inject
     SwitchManager switchManager;
+
+    final AtomicBoolean isUpdated = new AtomicBoolean(false);
 
 
     @RestClient
@@ -43,6 +48,7 @@ public class DatabaseController {
     PluginVersionRepository pluginVersionRepository;
 
 
+    @Transactional
     private void initDatabaseInternal() throws JsonProcessingException {
         switchManager.setDatabaseUpdating(true);
         ObjectMapper mapper = new ObjectMapper();
@@ -58,67 +64,7 @@ public class DatabaseController {
 //                .limit(10)
                 .forEach(p -> {
                     var id = p.get("id").textValue();
-                    var pluginStats = pluginStatsList.get(id);
-                    var versions = new HashSet<PluginVersion>();
-
-                    var name = p.get("name").textValue();
-                    var author = p.get("author").textValue();
-                    var description = p.get("description").textValue();
-                    var repoFullName = p.get("repo").textValue();
-
-
-                    var downloads = pluginStats.get("downloads").longValue();
-                    var updated = pluginStats.get("updated").longValue();
-
-                    var plugin = new Plugin(id, name, author, description);
-                    var pluginDetail = new PluginStatsDetails(downloads, updated);
-                    pluginDetail.setPlugin(plugin);
-
-                    pluginRepository.save(plugin);
-                    pluginStatsDetailsRepository.save(pluginDetail);
-
-                    pluginStats.fields().forEachRemaining(field -> {
-                        var versionName = field.getKey();
-                        var downloadsPerVer = field.getValue().longValue();
-                        if (!Objects.equals(versionName, "downloads") && !Objects.equals(versionName, "updated")) {
-                            var version = new PluginVersion(versionName, downloadsPerVer);
-                            versions.add(version);
-                        }
-                    });
-
-                    versions.forEach(ver -> {
-                        ver.setPlugin(plugin);
-                    });
-                    pluginVersionRepository.saveAll(versions);
-
-                    JsonNode repoJsonNode;
-                    try {
-                        var repoOwner = repoFullName.split("/")[0];
-                        var repoName = repoFullName.split("/")[1];
-                        repoJsonNode = githubRestClient.getRepo(token, repoOwner, repoName);
-                        var repo = new GithubRepository(repoOwner, repoName);
-
-                        repo.setPlugin(plugin);
-                        var topicJsonNode = repoJsonNode.get("topics");
-                        var topicsList = new HashSet<Topic>();
-                        repoRepository.save(repo);
-
-
-                        topicJsonNode.elements().forEachRemaining(e -> {
-                            var topic = new Topic(e.textValue());
-                            topicsList.add(topic);
-
-                        });
-                        repo.setTopics(topicsList);
-
-                        topicRepository.saveAll(topicsList);
-                        repoRepository.save(repo);
-
-
-                    } catch (ClientWebApplicationException e) {
-                        System.out.println(e);
-                        // do nothing
-                    }
+                    updatePlugin(pluginStatsList, p, id);
 
 //
 //
@@ -127,60 +73,207 @@ public class DatabaseController {
         switchManager.setDatabaseUpdating(false);
     }
 
+    private void updatePlugin(JsonNode pluginStatsList, JsonNode p, String id) {
+        System.out.println("In updated plugin function");
+        var pluginStats = pluginStatsList.get(id);
+        var versions = new HashSet<PluginVersion>();
+
+        var name = p.get("name").textValue();
+        var author = p.get("author").textValue();
+        var description = p.get("description").textValue();
+        var repoFullName = p.get("repo").textValue();
+
+        var downloads = pluginStats.get("downloads").longValue();
+        var updated = pluginStats.get("updated").longValue();
+
+        var plugin = new Plugin(id, name, author, description);
+        var pluginDetail = new PluginStatsDetails(downloads, updated);
+        pluginDetail.setPlugin(plugin);
+
+        pluginRepository.save(plugin);
+        pluginStatsDetailsRepository.save(pluginDetail);
+
+        pluginStats.fields().forEachRemaining(field -> {
+            var versionName = field.getKey();
+            var downloadsPerVer = field.getValue().longValue();
+            if (!Objects.equals(versionName, "downloads") && !Objects.equals(versionName, "updated")) {
+                var version = new PluginVersion(versionName, downloadsPerVer);
+                versions.add(version);
+            }
+        });
+
+        versions.forEach(ver -> ver.setPlugin(plugin));
+        pluginVersionRepository.saveAll(versions);
+
+        JsonNode repoJsonNode;
+        try {
+            var repoOwner = repoFullName.split("/")[0];
+            var repoName = repoFullName.split("/")[1];
+            repoJsonNode = githubRestClient.getRepo(token, repoOwner, repoName);
+            var repo = new GithubRepository(repoOwner, repoName);
+
+            repo.setPlugin(plugin);
+            var topicJsonNode = repoJsonNode.get("topics");
+            var topicsList = new HashSet<Topic>();
+            repoRepository.save(repo);
+
+            topicJsonNode.elements().forEachRemaining(e -> {
+                var topic = new Topic(e.textValue());
+                topicsList.add(topic);
+
+            });
+            repo.setTopics(topicsList);
+
+            topicRepository.saveAll(topicsList);
+            repoRepository.save(repo);
+
+        } catch (ClientWebApplicationException e) {
+            throw new RuntimeException(e);
+            // do nothing
+        }
+    }
+
+
+    @Inject
+    ManagedExecutor managedExecutor;
+
+    @Inject
+    MultiThreadingService multiThreadingService;
+
+    @Transactional
+    void updateDbInternal() throws JsonProcessingException {
+        System.out.println("Is updating db internal");
+        switchManager.setDatabaseUpdating(true);
+        var mapper = new ObjectMapper();
+
+        var pluginsList = mapper.readTree(obsidianPluginRestClient.getPlugins());
+        var pluginStatsList = mapper.readTree(obsidianPluginRestClient.getStatsOfPlugin());
+        StreamSupport.stream(
+                        Spliterators.spliteratorUnknownSize(
+                                pluginsList.elements(),
+                                Spliterator.ORDERED
+                        ), false)
+                .forEach(p -> {
+            System.out.println("in stream");
+            var pluginId = p.get("id").textValue();
+
+            var pluginExistInDbQ = pluginRepository.findByPluginIdIgnoreCase(pluginId);
+            System.out.println("1");
+            System.out.println(pluginExistInDbQ);
+            if (pluginExistInDbQ.isEmpty()) {
+                updatePlugin(pluginStatsList, p, pluginId);
+
+            } else {
+                var pluginFromDb = pluginExistInDbQ.get();
+                pluginFromDb.setName(p.get("name").textValue());
+                pluginFromDb.setAuthor(p.get("author").textValue());
+                pluginFromDb.setDescription(p.get("description").textValue());
+
+                pluginFromDb.setUpdatedOn(Instant.now());
+                pluginRepository.save(pluginFromDb);
+                var pluginStats = pluginStatsList.get(pluginId);
+                var totalDownloads = pluginStats.get("downloads").longValue();
+                var updated = pluginStats.get("updated").longValue();
+                var details = pluginFromDb.getStatsDetails();
+                details.setUpdated(updated);
+                details.setDownloads(totalDownloads);
+                pluginFromDb.setStatsDetails(details);
+                pluginRepository.save(pluginFromDb);
+
+                pluginStats.fields().forEachRemaining(field -> {
+                    var versionName = field.getKey();
+                    var downloadsPerVer = field.getValue().longValue();
+                    var versionWithNameFromDatabaseExists = pluginVersionRepository
+                            .findByVersionNameIgnoreCaseAndPlugin_PluginIdIgnoreCase(versionName, pluginFromDb.getPluginId());
+                    if (versionWithNameFromDatabaseExists.isEmpty()) {
+                        var newVersion = new PluginVersion(versionName, downloadsPerVer);
+                        newVersion.setPlugin(pluginFromDb);
+                        pluginVersionRepository.save(newVersion);
+                    }
+
+                });
+
+                // update repo
+                var repoFullName = p.get("repo").textValue().split("/");
+                var repoOwner = repoFullName[0];
+                var repoName = repoFullName[1];
+                var repoInDbExistQ = repoRepository.findByOwnerIgnoreCaseAndRepoNameIgnoreCase(repoOwner, repoName);
+                var repoFromRemote = githubRestClient.getRepo(token, repoOwner, repoName);
+                if (repoInDbExistQ.isEmpty()) {
+                    var newRepo = new GithubRepository(repoOwner, repoName);
+                    repoRepository.save(newRepo);
+
+                    updateTopicInEachRemote(repoFromRemote, newRepo);
+
+                } else {
+                    var repo = repoInDbExistQ.get();
+                    updateTopicInEachRemote(repoFromRemote, repo);
+
+                }
+
+            }
+        });
+        System.out.println("Finish");
+        switchManager.setDatabaseUpdating(false);
+        System.out.println(switchManager.getDatabaseUpdating());
+
+    }
+
+
     @GET
     @RolesAllowed("admin")
-    @Path("/syncTopic")
-    public RestResponse<Object> syncTopic() {
+    @Path("/updateDb")
+    public RestResponse<?> updateDataBase() throws JsonProcessingException {
         if (switchManager.getDatabaseUpdating()) {
-
             return RestResponse
                     .ResponseBuilder
-                    .create(400)
-                    .entity("Database is blocking, currently updating in background")
+                    .create(503)
+                    .entity("Database is blocking in the background, maybe it is updating")
                     .build();
         }
-
-
-        var repos = repoRepository.findAll();
-        var tempHashMap = new HashMap<Topic, HashSet<GithubRepository>>();
-        repos.forEach(r -> {
-            var topics = r.getTopics();
-            topics.forEach(t -> {
-                var repoOfTopic = Optional
-                        .ofNullable(tempHashMap.get(t))
-                        .orElse(new HashSet<>());
-                repoOfTopic.add(r);
-                tempHashMap.put(t, repoOfTopic);
-            });
+        multiThreadingService.getExecutorService().submit(() -> {
+            try {
+                updateDbInternal();
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException(e);
+            }
         });
-        tempHashMap.forEach((topic, reposOfTopic) -> {
-            topic.setRepos(reposOfTopic);
-            topicRepository.save(topic);
-        });
-
-        return RestResponse
-                .ResponseBuilder
+//        updateDbInternal();
+        return RestResponse.ResponseBuilder
                 .create(200)
-                .entity("Successful sync topic")
+                .entity("Start init db in the background, it may took time and will blocking the database.")
                 .build();
 
 
     }
 
-    @Inject
-    ManagedExecutor managedExecutor;
+    private void updateTopicInEachRemote(JsonNode repoFromRemote, GithubRepository newRepo) {
+        var topicJsonNode = repoFromRemote.get("topics");
+        topicJsonNode.elements().forEachRemaining(topic -> {
+            var topicExistInDbQ = topicRepository.findById(topic.textValue());
+            if (topicExistInDbQ.isEmpty()) {
+                var newTopic = new Topic(topic.textValue());
+                topicRepository.save(newTopic);
+                newRepo.getTopics().add(newTopic);
 
-    @RestClient
-    InternalRestClient internalRestClient;
+            }
+        });
+        repoRepository.save(newRepo);
+    }
 
 
     @GET
     @RolesAllowed("admin")
     @Path("/initDatabase")
-    public RestResponse<?> initDataBase() throws JsonProcessingException, ExecutionException, InterruptedException {
+    public RestResponse<?> initDataBase() {
+        if (switchManager.getDatabaseUpdating()){
+            return RestResponse.ResponseBuilder
+                .create(503)
+                .entity("Database is busay and locked")
+                .build();
+        }
 
-
-        managedExecutor.submit(() -> {
+        multiThreadingService.getExecutorService().submit(() -> {
             try {
                 initDatabaseInternal();
             } catch (JsonProcessingException e) {
@@ -209,7 +302,6 @@ public class DatabaseController {
 
     @Inject
     TopicRepository topicRepository;
-
 
 
     @GET
