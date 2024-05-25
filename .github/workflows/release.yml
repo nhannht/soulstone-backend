@@ -43,7 +43,7 @@ jobs:
           gh release create "$tag" \
           --title="$tag" \
           --draft \
-          soulstone-backend-$version-runner
+          target/soulstone-backend-$version-runner
           
         
           
