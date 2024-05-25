@@ -1,0 +1,52 @@
+name: release
+on:
+  push:
+    tags:
+      - "*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: "contains(github.event.head_commit.message,'build:')"
+    permissions: write-all
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '21'
+          distribution: 'mandrel'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          native-image-job-reports: 'true'
+          cache: "maven"
+
+      - name: build release
+        run: |
+          ./mvn build
+
+      - name: zip
+        uses: edgarrc/action-7z@v1
+        with:
+          args: 7z a -t7z -mx=9 soulstone_backend.7z ./target/quarkus-app
+
+      - name: "Get the tag"
+        id: get_tag
+        run: echo ::set-output name=tag::${GITHUB_REF#refs/tags/}
+
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag=${{ steps.get_tag.outputs.tag }}
+
+          gh release create "$tag" \
+          --title="$tag" \
+          --draft \
+            soulstone_backend.7z README.md
+          
+        
+          
+          

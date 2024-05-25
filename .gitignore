@@ -41,3 +41,5 @@ nb-configuration.xml
 
 # Plugin directory
 /.quarkus/cli/plugins/
+/hello.7z
+/hello.tar.gz
