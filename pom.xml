@@ -3,8 +3,8 @@
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <modelVersion>4.0.0</modelVersion>
   <groupId>dev.nhannht</groupId>
-  <artifactId>historica-stat-backend</artifactId>
-  <version>1.0.5</version>
+  <artifactId>soulstone-backend</artifactId>
+  <version>1.0.6</version>
   <properties>
     <compiler-plugin.version>3.12.1</compiler-plugin.version>
     <maven.compiler.release>21</maven.compiler.release>

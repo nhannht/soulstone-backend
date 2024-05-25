@@ -25,26 +25,28 @@ jobs:
 
       - name: build release
         run: |
-          mvn install
+          ./mvnw install -Dnative -DskipTests -Dquarkus.native.container-build=true
 
-      - name: compress
-        run: |
-          tar cvzf soulstone_backend.tar.gz ./target/quarkus-app
 
       - name: "Get the tag"
         id: get_tag
         run: echo ::set-output name=tag::${GITHUB_REF#refs/tags/}
+
+      - name: "Get the artifact version"
+        id: get_version
+        run: echo ::set-output name=version::${mvn help:evaluate -Dexpression=project.version -q -DforceStdout}
 
       - name: Create release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           tag=${{ steps.get_tag.outputs.tag }}
+          version=${{ steps.get_version.version }}
 
           gh release create "$tag" \
           --title="$tag" \
           --draft \
-          soulstone_backend.tar.gz
+          soulstone-backend-$version-runner
           
         
           
