@@ -50,7 +50,7 @@ public class DatabaseController {
 
 
     @Transactional
-    private void initDatabaseInternal() throws JsonProcessingException {
+    void initDatabaseInternal() throws JsonProcessingException {
         switchManager.setDatabaseUpdating(Boolean.TRUE);
         ObjectMapper mapper = new ObjectMapper();
         var pluginsList = mapper.readTree(obsidianPluginRestClient.getPlugins());
@@ -75,7 +75,7 @@ public class DatabaseController {
     }
 
     private void updatePlugin(JsonNode pluginStatsList, JsonNode p, String id) {
-        System.out.println("In updated plugin function");
+//        System.out.println("In updated plugin function");
         var pluginStats = pluginStatsList.get(id);
         var versions = new HashSet<PluginVersion>();
 
@@ -143,7 +143,7 @@ public class DatabaseController {
 
     @Transactional
     void updateDbInternal() throws JsonProcessingException {
-        System.out.println("Is updating db internal");
+//        System.out.println("Is updating db internal");
         switchManager.setDatabaseUpdating(Boolean.TRUE);
         var mapper = new ObjectMapper();
 
@@ -155,12 +155,12 @@ public class DatabaseController {
                                 Spliterator.ORDERED
                         ), false)
                 .forEach(p -> {
-            System.out.println("in stream");
+//            System.out.println("in stream");
             var pluginId = p.get("id").textValue();
 
             var pluginExistInDbQ = pluginRepository.findByPluginIdIgnoreCase(pluginId);
-            System.out.println("1");
-            System.out.println(pluginExistInDbQ);
+//            System.out.println("1");
+//            System.out.println(pluginExistInDbQ);
             if (pluginExistInDbQ.isEmpty()) {
                 updatePlugin(pluginStatsList, p, pluginId);
 
@@ -214,9 +214,24 @@ public class DatabaseController {
 
             }
         });
-        System.out.println("Finish");
+//        System.out.println("Finish");
         switchManager.setDatabaseUpdating(Boolean.FALSE);
-        System.out.println(switchManager.getDatabaseUpdating());
+//        System.out.println(switchManager.getDatabaseUpdating());
+
+    }
+
+    @Scheduled(every = "3600s")
+    void updatedDatabaseSchedule(){
+        if (switchManager.getDatabaseUpdating()) {
+            return;
+        }
+        multiThreadingService.getExecutorService().submit(() -> {
+            try {
+                updateDbInternal();
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException(e);
+            }
+        });
 
     }
 
@@ -224,7 +239,6 @@ public class DatabaseController {
     @GET
     @RolesAllowed("admin")
     @Path("/updateDb")
-    @Scheduled(every = "3600s")
     public RestResponse<?> updateDataBase() throws JsonProcessingException {
         if (switchManager.getDatabaseUpdating()) {
             return RestResponse
