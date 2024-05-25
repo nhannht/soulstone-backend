@@ -32,16 +32,13 @@ jobs:
         id: get_tag
         run: echo ::set-output name=tag::${GITHUB_REF#refs/tags/}
 
-      - name: "Get the artifact version"
-        id: get_version
-        run: echo ::set-output name=version::${mvn help:evaluate -Dexpression=project.version -q -DforceStdout}
 
       - name: Create release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           tag=${{ steps.get_tag.outputs.tag }}
-          version=${{ steps.get_version.version }}
+          version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
 
           gh release create "$tag" \
           --title="$tag" \
