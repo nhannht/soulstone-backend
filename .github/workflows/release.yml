@@ -25,7 +25,7 @@ jobs:
 
       - name: build release
         run: |
-          ./mvn build
+          mvn build
 
       - name: zip
         uses: edgarrc/action-7z@v1
