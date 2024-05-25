@@ -27,10 +27,9 @@ jobs:
         run: |
           mvn install
 
-      - name: zip
-        uses: edgarrc/action-7z@v1
-        with:
-          args: 7z a -t7z -mx=9 soulstone_backend.7z ./target/quarkus-app
+      - name: compress
+        run: |
+          tar cvzf soulstone_backend.tar.gz ./target/quarkus-app
 
       - name: "Get the tag"
         id: get_tag
@@ -45,7 +44,7 @@ jobs:
           gh release create "$tag" \
           --title="$tag" \
           --draft \
-            soulstone_backend.7z README.md
+          soulstone_backend.tar.gz
           
         
           
