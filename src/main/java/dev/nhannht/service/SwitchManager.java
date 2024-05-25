@@ -8,5 +8,5 @@ import lombok.Setter;
 @Setter
 @ApplicationScoped
 public class SwitchManager {
-    private Boolean databaseUpdating = false;
+    private Boolean databaseUpdating = Boolean.FALSE;
 }

@@ -9,6 +9,7 @@ import dev.nhannht.restclient.GithubRestClient;
 import dev.nhannht.restclient.ObsidianPluginRestClient;
 import dev.nhannht.service.MultiThreadingService;
 import dev.nhannht.service.SwitchManager;
+import io.quarkus.scheduler.Scheduled;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
@@ -50,7 +51,7 @@ public class DatabaseController {
 
     @Transactional
     private void initDatabaseInternal() throws JsonProcessingException {
-        switchManager.setDatabaseUpdating(true);
+        switchManager.setDatabaseUpdating(Boolean.TRUE);
         ObjectMapper mapper = new ObjectMapper();
         var pluginsList = mapper.readTree(obsidianPluginRestClient.getPlugins());
         var pluginStatsList = mapper.readTree(obsidianPluginRestClient.getStatsOfPlugin());
@@ -70,7 +71,7 @@ public class DatabaseController {
 //
                 })
         ;
-        switchManager.setDatabaseUpdating(false);
+        switchManager.setDatabaseUpdating(Boolean.FALSE);
     }
 
     private void updatePlugin(JsonNode pluginStatsList, JsonNode p, String id) {
@@ -83,8 +84,8 @@ public class DatabaseController {
         var description = p.get("description").textValue();
         var repoFullName = p.get("repo").textValue();
 
-        var downloads = pluginStats.get("downloads").longValue();
-        var updated = pluginStats.get("updated").longValue();
+        var downloads = Long.valueOf(pluginStats.get("downloads").longValue());
+        var updated = Long.valueOf(pluginStats.get("updated").longValue());
 
         var plugin = new Plugin(id, name, author, description);
         var pluginDetail = new PluginStatsDetails(downloads, updated);
@@ -95,7 +96,7 @@ public class DatabaseController {
 
         pluginStats.fields().forEachRemaining(field -> {
             var versionName = field.getKey();
-            var downloadsPerVer = field.getValue().longValue();
+            var downloadsPerVer = Long.valueOf(field.getValue().longValue());
             if (!Objects.equals(versionName, "downloads") && !Objects.equals(versionName, "updated")) {
                 var version = new PluginVersion(versionName, downloadsPerVer);
                 versions.add(version);
@@ -143,7 +144,7 @@ public class DatabaseController {
     @Transactional
     void updateDbInternal() throws JsonProcessingException {
         System.out.println("Is updating db internal");
-        switchManager.setDatabaseUpdating(true);
+        switchManager.setDatabaseUpdating(Boolean.TRUE);
         var mapper = new ObjectMapper();
 
         var pluginsList = mapper.readTree(obsidianPluginRestClient.getPlugins());
@@ -172,8 +173,8 @@ public class DatabaseController {
                 pluginFromDb.setUpdatedOn(Instant.now());
                 pluginRepository.save(pluginFromDb);
                 var pluginStats = pluginStatsList.get(pluginId);
-                var totalDownloads = pluginStats.get("downloads").longValue();
-                var updated = pluginStats.get("updated").longValue();
+                var totalDownloads = Long.valueOf(pluginStats.get("downloads").longValue());
+                var updated = Long.valueOf(pluginStats.get("updated").longValue());
                 var details = pluginFromDb.getStatsDetails();
                 details.setUpdated(updated);
                 details.setDownloads(totalDownloads);
@@ -182,7 +183,7 @@ public class DatabaseController {
 
                 pluginStats.fields().forEachRemaining(field -> {
                     var versionName = field.getKey();
-                    var downloadsPerVer = field.getValue().longValue();
+                    var downloadsPerVer = Long.valueOf(field.getValue().longValue());
                     var versionWithNameFromDatabaseExists = pluginVersionRepository
                             .findByVersionNameIgnoreCaseAndPlugin_PluginIdIgnoreCase(versionName, pluginFromDb.getPluginId());
                     if (versionWithNameFromDatabaseExists.isEmpty()) {
@@ -214,7 +215,7 @@ public class DatabaseController {
             }
         });
         System.out.println("Finish");
-        switchManager.setDatabaseUpdating(false);
+        switchManager.setDatabaseUpdating(Boolean.FALSE);
         System.out.println(switchManager.getDatabaseUpdating());
 
     }
@@ -223,6 +224,7 @@ public class DatabaseController {
     @GET
     @RolesAllowed("admin")
     @Path("/updateDb")
+    @Scheduled(every = "3600s")
     public RestResponse<?> updateDataBase() throws JsonProcessingException {
         if (switchManager.getDatabaseUpdating()) {
             return RestResponse
