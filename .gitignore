@@ -43,3 +43,4 @@ nb-configuration.xml
 /.quarkus/cli/plugins/
 /hello.7z
 /hello.tar.gz
+.obsidian/
