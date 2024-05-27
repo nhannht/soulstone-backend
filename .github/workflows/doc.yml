@@ -44,4 +44,4 @@ jobs:
                     cp ../soulstone/quartz.layout.ts ./
                     cp ../soulstone/wrangler.toml ./
                     npx  quartz build
-                    npx wrangler pages deploy
+                    npx wrangler pages deploy --branch=master
