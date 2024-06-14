@@ -10,6 +10,7 @@ import dev.nhannht.restclient.ObsidianPluginRestClient;
 import dev.nhannht.service.MultiThreadingService;
 import dev.nhannht.service.SwitchManager;
 import io.quarkus.scheduler.Scheduled;
+import jakarta.annotation.security.PermitAll;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
@@ -58,24 +59,24 @@ public class DatabaseController {
 
 
         StreamSupport.stream(
-                        Spliterators.spliteratorUnknownSize(
-                                pluginsList.elements(),
-                                Spliterator.ORDERED
-                        ), false)
+                Spliterators.spliteratorUnknownSize(
+                    pluginsList.elements(),
+                    Spliterator.ORDERED
+                ), false)
 //                .limit(10)
-                .forEach(p -> {
-                    var id = p.get("id").textValue();
-                    updatePlugin(pluginStatsList, p, id);
+            .forEach(p -> {
+                var id = p.get("id").textValue();
+                updatePlugin(pluginStatsList, p, id);
 
 //
 //
-                })
+            })
         ;
         switchManager.setDatabaseUpdating(Boolean.FALSE);
     }
 
-    private void updatePlugin(JsonNode pluginStatsList, JsonNode p, String id) {
-//        System.out.println("In updated plugin function");
+    void updatePlugin(JsonNode pluginStatsList, JsonNode p, String id) {
+        System.out.println("In updated plugin function");
         var pluginStats = pluginStatsList.get(id);
         var versions = new HashSet<PluginVersion>();
 
@@ -88,10 +89,15 @@ public class DatabaseController {
         var updated = Long.valueOf(pluginStats.get("updated").longValue());
 
         var plugin = new Plugin(id, name, author, description);
-        var pluginDetail = new PluginStatsDetails(downloads, updated);
-        pluginDetail.setPlugin(plugin);
-
         pluginRepository.save(plugin);
+
+        var tempPlugin = pluginRepository.findByPluginIdIgnoreCase(id);
+
+        System.out.println("Sucessfull save plugin without details");
+        var pluginDetail = new PluginStatsDetails(downloads, updated);
+        tempPlugin.ifPresent(pluginDetail::setPlugin);
+
+        System.out.println("Just set plugin details for plugin ");
         pluginStatsDetailsRepository.save(pluginDetail);
 
         pluginStats.fields().forEachRemaining(field -> {
@@ -141,6 +147,7 @@ public class DatabaseController {
     @Inject
     MultiThreadingService multiThreadingService;
 
+
     @Transactional
     void updateDbInternal() throws JsonProcessingException {
 //        System.out.println("Is updating db internal");
@@ -150,70 +157,72 @@ public class DatabaseController {
         var pluginsList = mapper.readTree(obsidianPluginRestClient.getPlugins());
         var pluginStatsList = mapper.readTree(obsidianPluginRestClient.getStatsOfPlugin());
         StreamSupport.stream(
-                        Spliterators.spliteratorUnknownSize(
-                                pluginsList.elements(),
-                                Spliterator.ORDERED
-                        ), false)
-                .forEach(p -> {
+                Spliterators.spliteratorUnknownSize(
+                    pluginsList.elements(),
+                    Spliterator.ORDERED
+                ), false)
+            .limit(11)
+            .forEach(p -> {
 //            System.out.println("in stream");
-            var pluginId = p.get("id").textValue();
+                var pluginId = p.get("id").textValue();
 
-            var pluginExistInDbQ = pluginRepository.findByPluginIdIgnoreCase(pluginId);
+                var pluginExistInDbQ = pluginRepository.findByPluginIdIgnoreCase(pluginId);
 //            System.out.println("1");
-//            System.out.println(pluginExistInDbQ);
-            if (pluginExistInDbQ.isEmpty()) {
-                updatePlugin(pluginStatsList, p, pluginId);
-
-            } else {
-                var pluginFromDb = pluginExistInDbQ.get();
-                pluginFromDb.setName(p.get("name").textValue());
-                pluginFromDb.setAuthor(p.get("author").textValue());
-                pluginFromDb.setDescription(p.get("description").textValue());
-
-                pluginFromDb.setUpdatedOn(Instant.now());
-                pluginRepository.save(pluginFromDb);
-                var pluginStats = pluginStatsList.get(pluginId);
-                var totalDownloads = Long.valueOf(pluginStats.get("downloads").longValue());
-                var updated = Long.valueOf(pluginStats.get("updated").longValue());
-                var details = pluginFromDb.getStatsDetails();
-                details.setUpdated(updated);
-                details.setDownloads(totalDownloads);
-                pluginFromDb.setStatsDetails(details);
-                pluginRepository.save(pluginFromDb);
-
-                pluginStats.fields().forEachRemaining(field -> {
-                    var versionName = field.getKey();
-                    var downloadsPerVer = Long.valueOf(field.getValue().longValue());
-                    var versionWithNameFromDatabaseExists = pluginVersionRepository
-                            .findByVersionNameIgnoreCaseAndPlugin_PluginIdIgnoreCase(versionName, pluginFromDb.getPluginId());
-                    if (versionWithNameFromDatabaseExists.isEmpty()) {
-                        var newVersion = new PluginVersion(versionName, downloadsPerVer);
-                        newVersion.setPlugin(pluginFromDb);
-                        pluginVersionRepository.save(newVersion);
-                    }
-
-                });
-
-                // update repo
-                var repoFullName = p.get("repo").textValue().split("/");
-                var repoOwner = repoFullName[0];
-                var repoName = repoFullName[1];
-                var repoInDbExistQ = repoRepository.findByOwnerIgnoreCaseAndRepoNameIgnoreCase(repoOwner, repoName);
-                var repoFromRemote = githubRestClient.getRepo(token, repoOwner, repoName);
-                if (repoInDbExistQ.isEmpty()) {
-                    var newRepo = new GithubRepository(repoOwner, repoName);
-                    repoRepository.save(newRepo);
-
-                    updateTopicInEachRemote(repoFromRemote, newRepo);
+                pluginExistInDbQ.ifPresent(plugin -> System.out.println(plugin.getName()));
+                if (pluginExistInDbQ.isEmpty()) {
+                    System.out.println("This plugin is not exist " + pluginId);
+                    updatePlugin(pluginStatsList, p, pluginId);
 
                 } else {
-                    var repo = repoInDbExistQ.get();
-                    updateTopicInEachRemote(repoFromRemote, repo);
+                    var pluginFromDb = pluginExistInDbQ.get();
+                    pluginFromDb.setName(p.get("name").textValue());
+                    pluginFromDb.setAuthor(p.get("author").textValue());
+                    pluginFromDb.setDescription(p.get("description").textValue());
+
+                    pluginFromDb.setUpdatedOn(Instant.now());
+                    pluginRepository.save(pluginFromDb);
+                    var pluginStats = pluginStatsList.get(pluginId);
+                    var totalDownloads = Long.valueOf(pluginStats.get("downloads").longValue());
+                    var updated = Long.valueOf(pluginStats.get("updated").longValue());
+                    var details = pluginFromDb.getStatsDetails();
+                    details.setUpdated(updated);
+                    details.setDownloads(totalDownloads);
+                    pluginFromDb.setStatsDetails(details);
+                    pluginRepository.save(pluginFromDb);
+
+                    pluginStats.fields().forEachRemaining(field -> {
+                        var versionName = field.getKey();
+                        var downloadsPerVer = Long.valueOf(field.getValue().longValue());
+                        var versionWithNameFromDatabaseExists = pluginVersionRepository
+                            .findByVersionNameIgnoreCaseAndPlugin_PluginIdIgnoreCase(versionName, pluginFromDb.getPluginId());
+                        if (versionWithNameFromDatabaseExists.isEmpty()) {
+                            var newVersion = new PluginVersion(versionName, downloadsPerVer);
+                            newVersion.setPlugin(pluginFromDb);
+                            pluginVersionRepository.save(newVersion);
+                        }
+
+                    });
+
+                    // update repo
+                    var repoFullName = p.get("repo").textValue().split("/");
+                    var repoOwner = repoFullName[0];
+                    var repoName = repoFullName[1];
+                    var repoInDbExistQ = repoRepository.findByOwnerIgnoreCaseAndRepoNameIgnoreCase(repoOwner, repoName);
+                    var repoFromRemote = githubRestClient.getRepo(token, repoOwner, repoName);
+                    if (repoInDbExistQ.isEmpty()) {
+                        var newRepo = new GithubRepository(repoOwner, repoName);
+                        repoRepository.save(newRepo);
+
+                        updateTopicInEachRemote(repoFromRemote, newRepo);
+
+                    } else {
+                        var repo = repoInDbExistQ.get();
+                        updateTopicInEachRemote(repoFromRemote, repo);
+
+                    }
 
                 }
-
-            }
-        });
+            });
 //        System.out.println("Finish");
         switchManager.setDatabaseUpdating(Boolean.FALSE);
 //        System.out.println(switchManager.getDatabaseUpdating());
@@ -221,7 +230,7 @@ public class DatabaseController {
     }
 
     @Scheduled(every = "3600s")
-    void updatedDatabaseSchedule(){
+    void updatedDatabaseSchedule() {
         if (switchManager.getDatabaseUpdating()) {
             return;
         }
@@ -240,25 +249,27 @@ public class DatabaseController {
     @RolesAllowed("admin")
     @Path("/updateDb")
     public RestResponse<?> updateDataBase() throws JsonProcessingException {
-        if (switchManager.getDatabaseUpdating()) {
-            return RestResponse
-                    .ResponseBuilder
-                    .create(503)
-                    .entity("Database is blocking in the background, maybe it is updating")
-                    .build();
-        }
-        multiThreadingService.getExecutorService().submit(() -> {
-            try {
+//        if (switchManager.getDatabaseUpdating()) {
+//            return RestResponse
+//                .ResponseBuilder
+//                .create(503)
+//                .entity("Database is blocking in the background, maybe it is updating")
+//                .build();
+//        }
+//        multiThreadingService.getExecutorService().submit(() -> {
+//            try {
                 updateDbInternal();
-            } catch (JsonProcessingException e) {
-                throw new RuntimeException(e);
-            }
-        });
+//            } catch (JsonProcessingException e) {
+//                throw new RuntimeException(e);
+//            }
+//        });
 //        updateDbInternal();
-        return RestResponse.ResponseBuilder
-                .create(200)
-                .entity("Start init db in the background, it may took time and will blocking the database.")
-                .build();
+//        return RestResponse.ResponseBuilder
+//            .create(200)
+//            .entity("Start init db in the background, it may took time and will blocking the database.")
+//            .build();
+
+        return RestResponse.ResponseBuilder.create(200).build();
 
 
     }
@@ -282,7 +293,7 @@ public class DatabaseController {
     @RolesAllowed("admin")
     @Path("/initDatabase")
     public RestResponse<?> initDataBase() {
-        if (switchManager.getDatabaseUpdating()){
+        if (switchManager.getDatabaseUpdating()) {
             return RestResponse.ResponseBuilder
                 .create(503)
                 .entity("Database is busay and locked")
@@ -300,9 +311,9 @@ public class DatabaseController {
 
 
         return RestResponse.ResponseBuilder
-                .create(200)
-                .entity("Start init db in the background, it may took time and will blocking the database.")
-                .build();
+            .create(200)
+            .entity("Start init db in the background, it may took time and will blocking the database.")
+            .build();
 
     }
 
