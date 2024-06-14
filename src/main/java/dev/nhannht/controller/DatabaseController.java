@@ -9,6 +9,7 @@ import dev.nhannht.restclient.GithubRestClient;
 import dev.nhannht.restclient.ObsidianPluginRestClient;
 import dev.nhannht.service.MultiThreadingService;
 import dev.nhannht.service.SwitchManager;
+import io.quarkus.narayana.jta.runtime.TransactionConfiguration;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.annotation.security.PermitAll;
 import jakarta.annotation.security.RolesAllowed;
@@ -135,8 +136,13 @@ public class DatabaseController {
             repoRepository.save(repo);
 
         } catch (ClientWebApplicationException e) {
-            throw new RuntimeException(e);
+            System.out.println("There is exception when call github client");
+            System.out.println(repoFullName);
+//            throw new RuntimeException(e);
             // do nothing
+        } finally {
+
+
         }
     }
 
@@ -149,6 +155,7 @@ public class DatabaseController {
 
 
     @Transactional
+    @TransactionConfiguration(timeout=3600)
     void updateDbInternal() throws JsonProcessingException {
 //        System.out.println("Is updating db internal");
         switchManager.setDatabaseUpdating(Boolean.TRUE);
@@ -208,17 +215,22 @@ public class DatabaseController {
                     var repoOwner = repoFullName[0];
                     var repoName = repoFullName[1];
                     var repoInDbExistQ = repoRepository.findByOwnerIgnoreCaseAndRepoNameIgnoreCase(repoOwner, repoName);
-                    var repoFromRemote = githubRestClient.getRepo(token, repoOwner, repoName);
-                    if (repoInDbExistQ.isEmpty()) {
-                        var newRepo = new GithubRepository(repoOwner, repoName);
-                        repoRepository.save(newRepo);
+                    try {
 
-                        updateTopicInEachRemote(repoFromRemote, newRepo);
+                        var repoFromRemote = githubRestClient.getRepo(token, repoOwner, repoName);
+                        if (repoInDbExistQ.isEmpty()) {
+                            var newRepo = new GithubRepository(repoOwner, repoName);
+                            repoRepository.save(newRepo);
 
-                    } else {
-                        var repo = repoInDbExistQ.get();
-                        updateTopicInEachRemote(repoFromRemote, repo);
+                            updateTopicInEachRemote(repoFromRemote, newRepo);
 
+                        } else {
+                            var repo = repoInDbExistQ.get();
+                            updateTopicInEachRemote(repoFromRemote, repo);
+
+                        }
+                    } catch (Exception e) {
+                        System.out.println("Cannot fetch plugin data from github");
                     }
 
                 }
@@ -229,18 +241,18 @@ public class DatabaseController {
 
     }
 
-    @Scheduled(every = "3600s")
-    void updatedDatabaseSchedule() {
+//    @Scheduled(every = "3600s")
+    void updatedDatabaseSchedule() throws JsonProcessingException {
         if (switchManager.getDatabaseUpdating()) {
             return;
         }
-        multiThreadingService.getExecutorService().submit(() -> {
-            try {
+//        multiThreadingService.getExecutorService().submit(() -> {
+//            try {
                 updateDbInternal();
-            } catch (JsonProcessingException e) {
-                throw new RuntimeException(e);
-            }
-        });
+//            } catch (JsonProcessingException e) {
+//                throw new RuntimeException(e);
+//            }
+//        });
 
     }
 
