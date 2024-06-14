@@ -7,7 +7,10 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.QueryParam;
 import org.jboss.resteasy.reactive.RestResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -20,9 +23,9 @@ public class PluginController {
     @Path("/plugin/all")
     @GET
     @CacheResult(cacheName="getAllPlugin-cache")
-    public Set<PluginDto> getAllPlugin(){
+    public Set<PluginDto> getAllPlugin(@QueryParam("page") Integer page){
 //        System.out.println(pluginRepository.findAll());
-        return pluginRepository.findAll().stream().map(PluginDto::new).collect(Collectors.toSet());
+        return pluginRepository.findAll(PageRequest.of(page,10)).stream().map(PluginDto::new).collect(Collectors.toSet());
 
 
     }
