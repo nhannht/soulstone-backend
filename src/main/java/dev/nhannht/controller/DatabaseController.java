@@ -161,7 +161,7 @@ public class DatabaseController {
                     pluginsList.elements(),
                     Spliterator.ORDERED
                 ), false)
-            .limit(11)
+//            .limit(11)
             .forEach(p -> {
 //            System.out.println("in stream");
                 var pluginId = p.get("id").textValue();
